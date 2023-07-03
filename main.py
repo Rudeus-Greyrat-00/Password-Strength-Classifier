@@ -2,11 +2,12 @@ import torch
 from torch import nn
 from torch import optim
 from torchtext.vocab import build_vocab_from_iterator
-from utils import PswDataset, double_char_tokenizer
+from utils import PswDataset, double_char_tokenizer, char_tokenizer
 from torch.utils.data import DataLoader
 from models import SimpleTextClassificationModel
 import time
 from training import evaluate, train
+
 
 """
 https://pytorch.org/tutorials/beginner/text_sentiment_ngrams_tutorial.html
@@ -14,11 +15,11 @@ https://pytorch.org/tutorials/beginner/text_sentiment_ngrams_tutorial.html
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-dataset = PswDataset("data.csv")
+dataset = PswDataset("data.csv")  # creating the dataset
 train_ds, test_ds = dataset.split(0.2)
 train_ds, val_ds = train_ds.split(0.2)
 
-tokenizer = double_char_tokenizer
+tokenizer = char_tokenizer
 train_iter = iter(train_ds)
 
 
@@ -53,6 +54,7 @@ def collate_batch(batch):
     text_list = torch.cat(text_list)
     return label_list.to(device), text_list.to(device), offsets.to(device)
 
+
 """
 dataloader = DataLoader(train_ds, batch_size=64, shuffle=True, collate_fn=collate_batch)
 dataloader2 = DataLoader(train_ds, batch_size=64, shuffle=False, collate_fn=collate_batch)
@@ -73,9 +75,9 @@ emsize = 64  # embedding dimension
 model = SimpleTextClassificationModel(vocab_size, emsize, num_classes).to(device)
 
 # Hyperparameters
-EPOCHS = 10 # epoch
+EPOCHS = 100  # epoch
 LR = 5  # learning rate
-BATCH_SIZE = 64 # batch size for training
+BATCH_SIZE = 128  # batch size for training
 
 criterion = torch.nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=LR)
@@ -94,11 +96,12 @@ print("Starting training...")
 for epoch in range(1, EPOCHS + 1):
     epoch_start_time = time.time()
     train(dataloader=train_dataloader, model=model, criterion=criterion, optimizer=optimizer, epoch=epoch)
-    accu_val = evaluate(dataloader=valid_dataloader, model=model , criterion=criterion)
+    accu_val = evaluate(dataloader=valid_dataloader, model=model, criterion=criterion)
+    torch.save(model.state_dict(), "weights/" + str(accu_val) + "_weights")
     if total_accu is not None and total_accu > accu_val:
-      scheduler.step()
+        scheduler.step()
     else:
-       total_accu = accu_val
+        total_accu = accu_val
     print('-' * 59)
     print('| end of epoch {:3d} | time: {:5.2f}s | '
           'valid accuracy {:8.3f} '.format(epoch,
@@ -109,6 +112,3 @@ for epoch in range(1, EPOCHS + 1):
 print('Checking the results of test dataset.')
 accu_test = evaluate(dataloader=test_dataloader, model=model, criterion=criterion)
 print('test accuracy {:8.3f}'.format(accu_test))
-
-
-
